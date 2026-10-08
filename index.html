@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>赛博酒测 · 测测你的赛博醉酒等级</title>
+<style>
+/* ============================================================
+   赛博酒测 · 全部样式内联，无任何外部依赖
+   配色：霓虹紫 / 电子青 / 品红点缀，暗色底 + 扫描线 + 辉光
+   ============================================================ */
+:root{
+  --font:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;
+  --bg:#05050b;
+  --neon:#a06cff;         /* 主霓虹紫 */
+  --neon2:#31e8ff;        /* 电子青 */
+  --pink:#ff2f8e;         /* 品红 */
+  --amber:#ffc94a;        /* 啤酒黄 */
+  --red:#ff3b5c;          /* 故障红 */
+  --txt:#dfe6ff;
+  --dim:#8b93c7;
+  --panel:rgba(15,12,32,.82);
+  --line:rgba(150,120,255,.32);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;padding:0}
+body{
+  background:radial-gradient(120% 85% at 50% 0%,#170f38 0%,#08060f 55%,#04040a 100%);
+  color:var(--txt);
+  font-family:var(--font);
+  overflow:hidden;
+  overscroll-behavior:none;
+  -webkit-user-select:none;user-select:none;
+}
+
+/* ---------- 全局 CRTS 扫描线 + 暗角 ---------- */
+#crt{position:fixed;inset:0;z-index:90;pointer-events:none;
+  background:repeating-linear-gradient(180deg,rgba(255,255,255,.035) 0 1px,rgba(0,0,0,0) 1px 3px);
+  mix-blend-mode:overlay}
+#crt::after{content:"";position:absolute;inset:0;
+  background:radial-gradient(115% 85% at 50% 38%,rgba(0,0,0,0) 42%,rgba(0,0,0,.78) 100%)}
+#beam{position:fixed;left:0;right:0;height:26vh;z-index:91;pointer-events:none;
+  background:linear-gradient(180deg,rgba(49,232,255,0),rgba(49,232,255,.055),rgba(160,108,255,0));
+  animation:beam 7.5s linear infinite}
+@keyframes beam{0%{top:-30vh}100%{top:110vh}}
+
+/* ---------- 屏幕容器 ---------- */
+.screen{position:absolute;inset:0;display:none;flex-direction:column;gap:10px;
+  padding:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom))}
+.screen.active{display:flex;animation:fadeIn .45s ease both}
+#scr-start,#scr-r{overflow-y:auto;-webkit-overflow-scrolling:touch}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.wrap{width:min(860px,100%);margin:0 auto}
+.center{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:16px 4px 28px}
+
+/* ---------- 故障艺术字 ---------- */
+.glitch{position:relative;display:inline-block;font-weight:900;letter-spacing:.04em;
+  text-shadow:0 0 14px rgba(160,108,255,.75),0 0 40px rgba(49,232,255,.35)}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;left:0;top:0;width:100%;
+  pointer-events:none;clip-path:inset(0 0 52% 0)}
+.glitch::before{color:var(--neon2);animation:g1 3.4s infinite steps(2)}
+.glitch::after{color:var(--pink);clip-path:inset(48% 0 0 0);animation:g2 2.7s infinite steps(2)}
+@keyframes g1{0%,86%,100%{transform:none;opacity:.9}88%{transform:translate(-5px,-2px)}93%{transform:translate(4px,1px)}96%{transform:translate(-2px,2px)}}
+@keyframes g2{0%,82%,100%{transform:none;opacity:.9}85%{transform:translate(5px,2px)}90%{transform:translate(-4px,-1px)}95%{transform:translate(2px,-2px)}}
+.big{font-size:clamp(38px,11vw,76px);line-height:1.05}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.32em;color:var(--neon2);opacity:.85}
+.sub{font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:var(--dim)}
+.intro{max-width:620px;font-size:14px;line-height:1.85;color:#c2cbf2;margin:2px 0}
+.tip{font-size:11.5px;color:var(--dim);line-height:1.7}
+
+/* ---------- 卡片 ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;width:100%;margin-top:4px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 13px;
+  text-align:left;box-shadow:inset 0 0 22px rgba(160,108,255,.09)}
+.card b{display:block;font-family:var(--mono);font-size:12.5px;color:var(--neon2);margin-bottom:6px;letter-spacing:.08em}
+.card span{font-size:12.5px;line-height:1.7;color:#b9c2ea}
+
+/* ---------- 按钮 ---------- */
+.btn{font-family:var(--font);font-size:15px;font-weight:700;letter-spacing:.1em;color:#f2ecff;
+  background:linear-gradient(180deg,rgba(160,108,255,.30),rgba(49,232,255,.14));
+  border:1px solid rgba(180,140,255,.75);border-radius:11px;padding:12px 26px;min-height:46px;
+  cursor:pointer;transition:transform .12s,box-shadow .2s,filter .2s;
+  box-shadow:0 0 16px rgba(160,108,255,.42),inset 0 0 16px rgba(49,232,255,.16);touch-action:manipulation}
+.btn:hover{filter:brightness(1.18)}
+.btn:active{transform:translateY(2px) scale(.99)}
+.btn.big{font-size:17px;padding:14px 40px;min-height:52px}
+.btn.ghost{background:rgba(255,255,255,.03);border-color:var(--line);box-shadow:none;font-weight:600}
+.hidden{display:none !important}
+.pulse{animation:pulse .42s ease-out}
+@keyframes pulse{0%{transform:scale(1)}40%{transform:scale(1.75);color:var(--red);text-shadow:0 0 14px var(--red)}100%{transform:scale(1)}}
+
+/* ---------- HUD ---------- */
+.hud{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;color:var(--dim)}
+.hud-tag{color:var(--neon2);letter-spacing:.14em}
+.hud-stat{margin-left:auto}
+.hud-stat+.hud-stat{margin-left:0}
+.hud b{color:#fff;font-size:14px}
+.bar{height:7px;border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden;border:1px solid var(--line)}
+.bar>i{display:block;height:100%;width:0%;border-radius:6px;
+  background:linear-gradient(90deg,var(--neon2),var(--neon),var(--pink));transition:width .18s linear;
+  box-shadow:0 0 12px rgba(49,232,255,.7)}
+
+/* ---------- 画布舞台 ---------- */
+.stage{position:relative;flex:1;min-height:0;border-radius:12px;overflow:hidden;
+  border:1px solid var(--line);background:#04040a;box-shadow:inset 0 0 60px rgba(160,108,255,.13)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.stage-tip{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:11.5px;
+  color:#9aa3d6;font-family:var(--mono);pointer-events:none;text-shadow:0 0 8px #000}
+#flash2{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(120% 100% at 50% 50%,rgba(255,59,92,.05),rgba(255,59,92,.55));transition:opacity .12s}
+#flash2.on{opacity:1}
+.glitchfx{animation:glitchfx .3s steps(2) 3}
+@keyframes glitchfx{
+  0%{filter:none;transform:none}
+  25%{filter:hue-rotate(90deg) saturate(2.2) contrast(1.3);transform:translate(-6px,2px) skewX(-2deg)}
+  50%{filter:hue-rotate(-70deg) invert(.12);transform:translate(5px,-3px) skewX(2deg)}
+  75%{filter:hue-rotate(160deg) saturate(2);transform:translate(-3px,-1px)}
+  100%{filter:none;transform:none}}
+
+/* ---------- 关卡三：绕口令 ---------- */
+.stage3{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:14px;touch-action:none}
+.timer{width:min(560px,86%);height:8px;border-radius:6px;background:rgba(255,255,255,.07);
+  overflow:hidden;border:1px solid var(--line);position:absolute;top:12px}
+.timer>i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--neon2),var(--amber),var(--red));
+  box-shadow:0 0 14px rgba(255,201,74,.7)}
+.twister{width:min(680px,94%);min-height:120px;display:flex;flex-wrap:wrap;justify-content:center;
+  align-items:center;gap:2px;font-size:clamp(19px,4.6vw,30px);font-weight:800;line-height:1.7;
+  padding:14px;border-radius:12px;background:rgba(49,232,255,.04);border:1px dashed rgba(49,232,255,.25)}
+.twister span{display:inline-block;color:var(--neon2);will-change:transform,filter;
+  text-shadow:0 0 12px rgba(49,232,255,.6)}
+.twister span.punc{color:var(--dim);text-shadow:none}
+
+/* ---------- 弹层 ---------- */
+#overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:radial-gradient(60% 60% at 50% 45%,rgba(30,16,64,.86),rgba(3,3,8,.95));backdrop-filter:blur(3px)}
+.ov-card{width:min(560px,100%);background:var(--panel);border:1px solid rgba(180,140,255,.5);border-radius:16px;
+  padding:22px 20px;text-align:center;box-shadow:0 0 40px rgba(160,108,255,.4),inset 0 0 30px rgba(49,232,255,.08);
+  animation:ovIn .35s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes ovIn{from{opacity:0;transform:translateY(18px) scale(.95)}to{opacity:1;transform:none}}
+.ov-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.3em;color:var(--neon2);margin-bottom:8px}
+.ov-title{font-size:clamp(26px,7vw,40px);margin:0 0 12px}
+.ov-body{font-size:13.5px;line-height:1.9;color:#c3cbf3;margin-bottom:18px}
+.ov-body b{color:#fff}
+.ov-count{font-size:88px;font-weight:900;color:var(--neon2);text-shadow:0 0 30px rgba(49,232,255,.8);line-height:1.1;margin:10px 0 18px}
+.pop{animation:pop .45s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes pop{from{transform:scale(.5);opacity:.2}to{transform:scale(1);opacity:1}}
+
+/* ---------- 报告 ---------- */
+.report{display:flex;flex-direction:column;gap:13px;align-items:center;text-align:center;padding-bottom:26px}
+.report h2{font-size:clamp(24px,6.4vw,40px);margin:0}
+.title-card{width:100%;background:linear-gradient(135deg,rgba(160,108,255,.22),rgba(49,232,255,.1));
+  border:1px solid rgba(180,140,255,.6);border-radius:16px;padding:16px;
+  box-shadow:0 0 30px rgba(160,108,255,.32),inset 0 0 28px rgba(49,232,255,.1)}
+.tc-label{font-family:var(--mono);font-size:11px;letter-spacing:.3em;color:var(--dim)}
+.tc-name{font-size:clamp(24px,6.6vw,40px);font-weight:900;margin:6px 0;
+  color:#fff;text-shadow:0 0 18px rgba(49,232,255,.75),0 0 46px rgba(255,47,142,.45)}
+.tc-tag{font-family:var(--mono);font-size:12.5px;color:var(--amber);letter-spacing:.06em}
+.r-grid{display:grid;grid-template-columns:minmax(280px,1.05fr) minmax(250px,1fr);gap:12px;width:100%}
+@media (max-width:660px){.r-grid{grid-template-columns:1fr}}
+.r-radar{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:6px}
+#cvR{width:100%;height:330px;display:block}
+.r-bars{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;
+  display:flex;flex-direction:column;gap:10px;justify-content:center}
+.rbar{text-align:left}
+.rbar .k{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-bottom:4px}
+.rbar .k b{color:#fff}
+.rbar .t{height:9px;border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden;border:1px solid var(--line)}
+.rbar .t>i{display:block;height:100%;width:0;border-radius:6px;transition:width .9s cubic-bezier(.2,1,.3,1);
+  background:linear-gradient(90deg,var(--neon2),var(--neon),var(--pink));box-shadow:0 0 12px rgba(160,108,255,.7)}
+.r-comment{width:100%;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--neon2);
+  border-radius:12px;padding:14px;text-align:left;font-size:13.5px;line-height:1.95;color:#c9d1f5}
+.r-raw{width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px}
+.raw{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:8px 10px;
+  font-family:var(--mono);font-size:11.5px;color:var(--dim);text-align:left}
+.raw b{display:block;font-size:17px;color:var(--neon2);margin-top:3px;font-family:var(--font)}
+.r-drunk{width:100%;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);
+  font-size:12px;color:var(--dim)}
+.r-drunk b{font-size:26px;color:var(--red);text-shadow:0 0 16px rgba(255,59,92,.75)}
+.r-bar{width:100%;height:14px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden;border:1px solid var(--line)}
+.r-bar>i{display:block;height:100%;width:0;border-radius:8px;transition:width 1.1s cubic-bezier(.2,1,.3,1);
+  background:linear-gradient(90deg,#31e8ff,#a06cff,#ff2f8e,#ff3b5c);box-shadow:0 0 16px rgba(255,47,142,.7)}
+.r-note{font-size:11.5px;color:var(--dim);line-height:1.8;max-width:640px}
+.r-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);z-index:95;
+  background:rgba(20,14,44,.95);border:1px solid var(--neon2);color:#fff;font-size:13px;
+  padding:10px 20px;border-radius:10px;box-shadow:0 0 22px rgba(49,232,255,.5);animation:pop .3s both}
+@media (max-width:520px){
+  .hud{font-size:11px;gap:7px;padding:7px 9px}
+  .hud b{font-size:12.5px}
+  .card{padding:10px}
+  .btn{padding:11px 20px;font-size:14px}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+<div id="beam"></div>
+
+<!-- ===================== 开始界面 ===================== -->
+<section class="screen active" id="scr-start">
+  <div class="wrap center">
+    <div class="kicker">CYBER · ALCOHOL · TEST · CENTER</div>
+    <h1 class="glitch big" data-text="赛博酒测">赛博酒测</h1>
+    <div class="sub">测测你的赛博醉酒等级 · v2.077</div>
+    <p class="intro">欢迎来到 24 小时无人值守的「赛博醉酒体检中心」。<br />
+      接下来你将接受三项荒诞体检：走直线、接酒杯、读绕口令。<br />
+      系统会根据你的真实操作数据，出具一份一本正经胡说八道的《赛博醉酒鉴定报告》。</p>
+    <div class="cards">
+      <div class="card"><b>01 走直线</b><span>按住方向键 / 拖动屏幕，沿弯曲的霓虹小路走到终点。走歪会被系统记录，路还会自己扭。</span></div>
+      <div class="card"><b>02 接酒杯</b><span>鼠标 / 手指控制篮子。接酒杯加分，接到「代码」扣分并引发屏幕故障抖动。</span></div>
+      <div class="card"><b>03 读绕口令</b><span>文字会越来越扭曲、模糊、变色。读得下去就点「我还能读」。</span></div>
+    </div>
+    <button class="btn big" id="btn-start">开始体检</button>
+    <div class="tip">键盘 ← → ↑ 或触屏拖动 · 建议横屏 / 全屏 · 本报告没有任何医学效力</div>
+  </div>
+</section>
+
+<!-- ===================== 关卡一 ===================== -->
+<section class="screen" id="scr-1">
+  <header class="hud">
+    <span class="hud-tag">01 / 走直线</span>
+    <span class="hud-stat">走歪 <b id="h1-dev">0</b> 次</span>
+    <span class="hud-stat">剩余 <b id="h1-time">60</b>s</span>
+    <span class="hud-stat">进度 <b id="h1-prog">0</b>%</span>
+  </header>
+  <div class="stage">
+    <canvas id="cv1"></canvas>
+    <div class="stage-tip" id="tip1">按住 ↑ 前进 · ← → 控制左右 · 触屏按住屏幕拖动</div>
+  </div>
+  <div class="bar"><i id="bar1"></i></div>
+</section>
+
+<!-- ===================== 关卡二 ===================== -->
+<section class="screen" id="scr-2">
+  <header class="hud">
+    <span class="hud-tag">02 / 接酒杯</span>
+    <span class="hud-stat">得分 <b id="h2-score">0</b></span>
+    <span class="hud-stat">连击 <b id="h2-combo">0</b></span>
+    <span class="hud-stat">醉意 <b id="h2-drunk">0</b>%</span>
+    <span class="hud-stat">剩余 <b id="h2-time">35</b>s</span>
+  </header>
+  <div class="stage" id="stage2">
+    <canvas id="cv2"></canvas>
+    <div id="flash2"></div>
+    <div class="stage-tip">移动鼠标 / 按住屏幕拖动，控制底部篮子</div>
+  </div>
+</section>
+
+<!-- ===================== 关卡三 ===================== -->
+<section class="screen" id="scr-3">
+  <header class="hud">
+    <span class="hud-tag">03 / 读绕口令</span>
+    <span class="hud-stat">已读 <b id="h3-round">0</b> 轮</span>
+    <span class="hud-stat">扭曲等级 <b id="h3-lv">1</b></span>
+  </header>
+  <div class="stage stage3">
+    <div class="timer"><i id="bar3"></i></div>
+    <div class="twister" id="twister"></div>
+    <button class="btn big" id="btn-read">我 还 能 读</button>
+    <button class="btn ghost" id="btn-giveup">读不动了…</button>
+    <div class="stage-tip">在心里默读上面的文字，读得下去就按键</div>
+  </div>
+</section>
+
+<!-- ===================== 报告界面 ===================== -->
+<section class="screen" id="scr-r">
+  <div class="wrap report">
+    <div class="kicker">CYBER ALCOHOL TEST REPORT · <span id="r-serial">#0000</span></div>
+    <h2 class="glitch" id="r-head" data-text="赛博醉酒鉴定报告">赛博醉酒鉴定报告</h2>
+    <div class="title-card">
+      <div class="tc-label">授 予 称 号</div>
+      <div class="tc-name" id="r-title">—</div>
+      <div class="tc-tag" id="r-tag">—</div>
+    </div>
+    <div class="r-grid">
+      <div class="r-radar"><canvas id="cvR"></canvas></div>
+      <div class="r-bars" id="r-bars"></div>
+    </div>
+    <div class="r-comment" id="r-comment"></div>
+    <div class="r-raw" id="r-raw"></div>
+    <div class="r-drunk"><span>赛博醉酒指数（越高越离谱）</span><b id="r-level">Lv.1</b></div>
+    <div class="r-bar"><i id="r-drunkbar"></i></div>
+    <div class="r-note">※ 本报告由一台同样喝多了的服务器生成，仅供娱乐，不具备任何医学、法律、玄学效力。<br />
+      如需真正醒酒，请关闭本页面并喝一杯温水。</div>
+    <div class="r-actions">
+      <button class="btn" id="btn-copy">复制报告</button>
+      <button class="btn ghost" id="btn-again">再测一次</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 通用弹层（过关简报 / 简报 / 倒计时） ===================== -->
+<div id="overlay" class="hidden">
+  <div class="ov-card">
+    <div class="ov-kicker" id="ov-kicker">CLEARED</div>
+    <h2 class="glitch ov-title" id="ov-title" data-text="OK">OK</h2>
+    <div class="ov-body" id="ov-body"></div>
+    <button class="btn big" id="ov-btn">继续</button>
+    <div class="ov-count hidden" id="ov-count">3</div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* ============================================================
+   0. 通用工具
+   ============================================================ */
+const $  = s => document.querySelector(s);
+const $$ = s => Array.prototype.slice.call(document.querySelectorAll(s));
+const TAU = Math.PI * 2;
+const clamp = (v,a,b) => v < a ? a : (v > b ? b : v);
+const rnd = (a,b) => a + Math.random() * (b - a);
+const lerp = (a,b,t) => a + (b - a) * t;
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+/* 把画布按 devicePixelRatio 适配容器尺寸，返回逻辑宽高与上下文 */
+function fitCanvas(cv){
+  const r = cv.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, Math.round(r.width));
+  const h = Math.max(1, Math.round(r.height));
+  cv.width  = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { ctx, w, h, dpr };
+}
+/* 圆角矩形路径 */
+function rr(c,x,y,w,h,r){
+  r = Math.min(r, w/2, h/2);
+  c.beginPath();
+  c.moveTo(x+r,y);
+  c.arcTo(x+w,y,x+w,y+h,r);
+  c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r);
+  c.arcTo(x,y,x+w,y,r);
+  c.closePath();
+}
+/* 元素抖动放大反馈 */
+function flashEl(el){
+  if(!el) return;
+  el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
+}
+
+/* ---------- 音效：用 WebAudio 现场合成，不依赖任何音频文件 ---------- */
+let AC = null, soundOn = true;
+function beep(freq, dur, type, vol, slideTo){
+  if(!soundOn) return;
+  try{
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    if(!AC) AC = new Ctx();
+    if(AC.state === 'suspended') AC.resume();
+    const t0 = AC.currentTime;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'square';
+    o.frequency.setValueAtTime(freq, t0);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.07, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t0); o.stop(t0 + dur + 0.03);
+  }catch(e){ /* 音频不可用时静默忽略 */ }
+}
+
+/* ---------- 键盘状态（三个关卡共用） ---------- */
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].indexOf(e.code) >= 0) e.preventDefault();
+  // 空格 / 回车 也能推进弹层
+  if((e.code === 'Space' || e.code === 'Enter') && !ov.el.classList.contains('hidden')){
+    if(!ov.btn.classList.contains('hidden')) ov.btn.click();
+  }
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+window.addEventListener('blur', () => { for(const k in keys) keys[k] = false; });
+
+/* ---------- 界面切换 ---------- */
+function show(id){
+  $$('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+}
+
+/* ---------- 弹层控制 ---------- */
+const ov = { el:$('#overlay'), kicker:$('#ov-kicker'), title:$('#ov-title'),
+             body:$('#ov-body'), btn:$('#ov-btn'), count:$('#ov-count'), next:null };
+
+function showOverlay(kicker, title, bodyHtml, btnText, cb){
+  ov.kicker.textContent = kicker;
+  ov.title.textContent = title;
+  ov.title.setAttribute('data-text', title);   // 故障字需要 data-text 才能复制出残影
+  ov.body.innerHTML = bodyHtml;
+  ov.btn.textContent = btnText;
+  ov.next = cb;
+  ov.count.classList.add('hidden');
+  ov.btn.classList.remove('hidden');
+  ov.body.classList.remove('hidden');
+  ov.el.classList.remove('hidden');
+}
+/* 3-2-1 倒计时后启动关卡 */
+function countdownThen(cb){
+  let n = 3;
+  ov.btn.classList.add('hidden');
+  ov.body.classList.add('hidden');
+  ov.count.classList.remove('hidden');
+  (function step(){
+    if(n <= 0){
+      ov.count.classList.add('hidden');
+      ov.el.classList.add('hidden');
+      ov.btn.classList.remove('hidden');
+      ov.body.classList.remove('hidden');
+      cb();
+      return;
+    }
+    ov.count.textContent = n;
+    ov.count.classList.remove('pop'); void ov.count.offsetWidth; ov.count.classList.add('pop');
+    beep(n === 1 ? 900 : 440, 0.12, 'square', 0.05);
+    n--;
+    setTimeout(step, 480);
+  })();
+}
+ov.btn.addEventListener('click', () => {
+  if(!ov.next) return;
+  const f = ov.next; ov.next = null;
+  beep(620, 0.08, 'square', 0.05);
+  countdownThen(f);
+});
+
+/* ---------- 小提示条 ---------- */
+function toast(msg){
+  const d = document.createElement('div');
+  d.className = 'toast'; d.textContent = msg;
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 1800);
+}
+
+/* ============================================================
+   1. 全局统计数据（报告的唯一数据来源，全部来自真实操作）
+   ============================================================ */
+const stats = {};
+function resetStats(){
+  stats.walkDev = 0;        // 走歪次数
+  stats.walkOffMs = 0;      // 出界总时长（毫秒）
+  stats.walkMs = 0;         // 走直线耗时
+  stats.walkProgress = 0;   // 完成度 0~1
+  stats.walkPassed = false; // 是否走到终点
+  stats.score = 0;          // 接酒杯得分
+  stats.bestCombo = 0;      // 最高连击
+  stats.glasses = 0;        // 接住酒杯
+  stats.beers = 0;          // 接住啤酒
+  stats.codes = 0;          // 误接代码
+  stats.cats = 0;           // 接住猫
+  stats.missed = 0;         // 漏接
+  stats.rounds = 0;         // 绕口令成功轮数
+  stats.reactList = [];     // 每轮反应耗时
+  stats.readPerfect = false;// 是否读满全部轮次
+}
+
+/* ============================================================
+   2. 关卡一：走直线
+   玩法：按住 ↑ / 按住屏幕前进，← → 或拖动控制左右。
+   判定：偏离霓虹小路记为「走歪」，出界期间前进速度减半。
+   难点：小路是双向正弦叠加的弯道，且会随时间自我扭动。
+   ============================================================ */
+const L1 = {
+  cv:$('#cv1'), ctx:null, w:0, h:0, dpr:1,
+  raf:0, on:false, last:0, t:0,
+  y:0, x:0, vx:0, holding:false, px:null,
+  isOff:false, dev:0, offMs:0, runMs:0,
+  LEN:2600, LIMIT:60000, flashT:0
+};
+
+function l1Resize(){
+  const o = fitCanvas(L1.cv);
+  L1.ctx = o.ctx; L1.w = o.w; L1.h = o.h; L1.dpr = o.dpr;
+  L1.x = clamp(L1.x || L1.w/2, 14, L1.w - 14);
+}
+/* 小路中轴：两条正弦叠加而成，t 让它自己扭动，进度越大扭得越狠 */
+function l1Center(wy, t){
+  const w = L1.w;
+  const p = clamp(L1.y / L1.LEN, 0, 1);
+  const maxA = Math.max(34, w * 0.5 - 62);
+  const a1 = Math.min(maxA * 0.62, 165 * (1 + p * 0.5));
+  const a2 = Math.min(maxA * 0.34, 72 * (1 + p * 0.75));
+  return w * 0.5 + Math.sin(wy / 340 + t * 0.50) * a1
+                 + Math.sin(wy / 140 - t * 0.95) * a2;
+}
+/* 小路半宽：越往后越窄 */
+function l1HalfW(){
+  const p = clamp(L1.y / L1.LEN, 0, 1);
+  return Math.min(L1.w * 0.17, 46) * (1 - p * 0.22);
+}
+
+function l1Start(){
+  l1Resize();
+  L1.on = true; L1.t = 0; L1.last = 0;
+  L1.y = 30; L1.x = l1Center(L1.y, 0); L1.vx = 0;
+  L1.holding = false; L1.px = null;
+  L1.isOff = false; L1.dev = 0; L1.offMs = 0; L1.runMs = 0; L1.flashT = 0;
+  $('#h1-dev').textContent = '0';
+  $('#h1-prog').textContent = '0';
+  $('#h1-time').textContent = '60';
+  $('#bar1').style.width = '0%';
+  l1Resize();
+  L1.raf = requestAnimationFrame(l1Frame);
+}
+
+function l1Frame(ts){
+  if(!L1.on) return;
+  if(!L1.last) L1.last = ts;
+  const dt = Math.min(0.05, (ts - L1.last) / 1000);
+  L1.last = ts;
+  L1.t += dt;
+  L1.runMs += dt * 1000;
+  if(L1.flashT > 0) L1.flashT -= dt;
+
+  /* --- 横向操控 --- */
+  const keySteer = (keys.ArrowLeft || keys.KeyA ? -1 : 0) + (keys.ArrowRight || keys.KeyD ? 1 : 0);
+  let target;
+  if(L1.px != null){
+    // 触屏/鼠标按住拖动：手指位置就是目标点，距离越远拉得越快
+    target = clamp((L1.px - L1.x) * 7, -270, 270);
+  }else{
+    target = keySteer * 235;
+  }
+  const k = 1 - Math.exp(-dt * 9);
+  L1.vx += (target - L1.vx) * k;
+  if(L1.px == null) L1.vx += Math.sin(L1.t * 6.3) * 8 * dt;   // 醉酒式轻微飘移
+  L1.x = clamp(L1.x + L1.vx * dt, 12, L1.w - 12);
+
+  /* --- 前进 --- */
+  const holding = !!(keys.ArrowUp || keys.KeyW || keys.Space || L1.holding);
+  const spd = 178 * (L1.isOff ? 0.5 : 1);   // 踩空了就走得慢
+  if(holding) L1.y += spd * dt;
+
+  /* --- 走歪判定：从界内跨到界外算一次 --- */
+  const cx = l1Center(L1.y, L1.t);
+  const hw = l1HalfW();
+  const off = Math.abs(L1.x - cx) > hw - 8;
+  if(off && !L1.isOff){
+    L1.isOff = true; L1.dev++; L1.flashT = 0.45;
+    beep(140, 0.16, 'sawtooth', 0.06, 90);
+    flashEl($('#h1-dev'));
+  }else if(!off && L1.isOff){
+    L1.isOff = false;
+  }
+  if(off) L1.offMs += dt * 1000;
+
+  /* --- HUD --- */
+  const prog = clamp(L1.y / L1.LEN, 0, 1);
+  $('#h1-dev').textContent = L1.dev;
+  $('#h1-prog').textContent = Math.floor(prog * 100);
+  $('#h1-time').textContent = Math.max(0, Math.ceil((L1.LIMIT - L1.runMs) / 1000));
+  $('#bar1').style.width = (prog * 100).toFixed(1) + '%';
+
+  l1Render(holding, dt);
+
+  if(L1.y >= L1.LEN){ stats.walkProgress = 1; l1Finish(true); return; }
+  if(L1.runMs >= L1.LIMIT){ stats.walkProgress = prog; l1Finish(false); return; }
+  L1.raf = requestAnimationFrame(l1Frame);
+}
+
+function l1Render(holding, dt){
+  const c = L1.ctx, w = L1.w, h = L1.h;
+  if(!c) return;
+  c.setTransform(L1.dpr,0,0,L1.dpr,0,0);
+  c.clearRect(0,0,w,h);
+
+  /* 背景 */
+  const bg = c.createLinearGradient(0,0,0,h);
+  bg.addColorStop(0,'#090720'); bg.addColorStop(.55,'#05040f'); bg.addColorStop(1,'#0b0620');
+  c.fillStyle = bg; c.fillRect(0,0,w,h);
+
+  /* 相机：让小人始终在屏幕 65% 高度处 */
+  const cam = L1.y - h * 0.35;
+  const toSY = wy => h - (wy - cam);
+  const progress = clamp(L1.y / L1.LEN, 0, 1);
+
+  /* 背景网格 */
+  c.strokeStyle = 'rgba(120,90,220,.16)'; c.lineWidth = 1;
+  const gridStep = 90;
+  const firstY = Math.floor(cam / gridStep) * gridStep;
+  c.beginPath();
+  for(let wy = firstY; wy < cam + h + gridStep; wy += gridStep){
+    const sy = toSY(wy);
+    c.moveTo(0,sy); c.lineTo(w,sy);
+  }
+  for(let x = (w % 70) / 2; x < w; x += 70){ c.moveTo(x,0); c.lineTo(x,h); }
+  c.stroke();
+
+  /* 霓虹小路：采样两侧边界，先填色再描边 */
+  const pts = [];
+  for(let sy = -12; sy <= h + 12; sy += 7){
+    const wy = cam + (h - sy);
+    pts.push([l1Center(wy, L1.t), sy]);
+  }
+  const hwNow = l1HalfW();
+
+  c.beginPath();
+  for(let i = 0; i < pts.length; i++){
+    const x = pts[i][0] - hwNow, y = pts[i][1];
+    i ? c.lineTo(x,y) : c.moveTo(x,y);
+  }
+  for(let i = pts.length - 1; i >= 0; i--){
+    c.lineTo(pts[i][0] + hwNow, pts[i][1]);
+  }
+  c.closePath();
+  const roadGrad = c.createLinearGradient(0,0,0,h);
+  roadGrad.addColorStop(0,'rgba(160,108,255,.05)');
+  roadGrad.addColorStop(.5,'rgba(160,108,255,.22)');
+  roadGrad.addColorStop(1,'rgba(49,232,255,.10)');
+  c.fillStyle = roadGrad; c.fill();
+
+  /* 中线虚线 */
+  c.save();
+  c.setLineDash([16,20]);
+  c.lineDashOffset = -(L1.y * 0.9) % 36;
+  c.strokeStyle = 'rgba(49,232,255,.35)'; c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(pts[0][0], pts[0][1]);
+  for(let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+  c.stroke();
+  c.restore();
+
+  /* 左右霓虹边线（带辉光） */
+  c.save();
+  c.shadowColor = '#a06cff'; c.shadowBlur = 18;
+  c.strokeStyle = L1.isOff ? '#ff3b5c' : '#b98cff';
+  c.lineWidth = 3;
+  c.beginPath();
+  for(let i = 0; i < pts.length; i++){ const x = pts[i][0] - hwNow; i ? c.lineTo(x,pts[i][1]) : c.moveTo(x,pts[i][1]); }
+  c.stroke();
+  c.strokeStyle = L1.isOff ? '#ff2f8e' : '#31e8ff';
+  c.beginPath();
+  for(let i = 0; i < pts.length; i++){ const x = pts[i][0] + hwNow; i ? c.lineTo(x,pts[i][1]) : c.moveTo(x,pts[i][1]); }
+  c.stroke();
+  c.restore();
+
+  /* 起点 / 终点 */
+  const drawGate = (wy, color, text) => {
+    const sy = toSY(wy);
+    if(sy < -40 || sy > h + 40) return;
+    const cxTop = l1Center(wy, L1.t);
+    c.save();
+    c.strokeStyle = color; c.shadowColor = color; c.shadowBlur = 20; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(cxTop - hwNow, sy); c.lineTo(cxTop + hwNow, sy); c.stroke();
+    c.shadowBlur = 0;
+    c.fillStyle = color; c.font = 'bold 12px ' + getComputedStyle(document.body).fontFamily;
+    c.textAlign = 'center';
+    c.fillText(text, cxTop, sy - 8);
+    c.restore();
+  };
+  drawGate(0, '#8b93c7', '起点');
+  drawGate(L1.LEN, '#31e8ff', '终点 · 清醒之门');
+
+  /* 小人 */
+  const squat = holding ? Math.sin(L1.t * 14) : 0;
+  const screenY = toSY(L1.y);
+  l1Walker(c, L1.x, screenY, clamp(L1.vx / 900, -0.22, 0.22), L1.t * (holding ? 13 : 3), squat);
+
+  /* 出界红色警示 */
+  if(L1.isOff){
+    const a = 0.20 + Math.abs(Math.sin(L1.t * 12)) * 0.18;
+    const g = c.createRadialGradient(w/2,h/2,Math.min(w,h)*0.25,w/2,h/2,Math.max(w,h)*0.7);
+    g.addColorStop(0,'rgba(255,59,92,0)'); g.addColorStop(1,'rgba(255,59,92,' + a.toFixed(3) + ')');
+    c.fillStyle = g; c.fillRect(0,0,w,h);
+    c.save();
+    c.fillStyle = '#ff3b5c'; c.font = 'bold 26px ' + getComputedStyle(document.body).fontFamily;
+    c.textAlign = 'center'; c.shadowColor = '#ff3b5c'; c.shadowBlur = 22;
+    c.fillText('走 歪 了 !', w/2, 54);
+    c.restore();
+  }
+  /* 进度条顶部提示 */
+  c.save();
+  c.fillStyle = 'rgba(255,255,255,.35)';
+  c.font = '11px ui-monospace,monospace';
+  c.textAlign = 'left';
+  c.fillText('PROGRESS ' + Math.floor(progress * 100) + '%   OFF-TRACK ' + L1.dev, 10, h - 12);
+  c.restore();
+}
+
+/* 画一个赛博小人 */
+function l1Walker(c, x, y, tilt, phase, squat){
+  c.save();
+  c.translate(x, y + squat);
+  c.rotate(tilt);
+  c.fillStyle = 'rgba(0,0,0,.4)';
+  c.beginPath(); c.ellipse(0, 12, 13, 4, 0, 0, TAU); c.fill();
+  c.shadowColor = '#31e8ff'; c.shadowBlur = 16;
+  c.strokeStyle = '#a8f4ff'; c.lineWidth = 2; c.fillStyle = 'rgba(49,232,255,.22)';
+  rr(c, -6, -12, 12, 19, 5); c.fill(); c.stroke();          // 身体
+  c.beginPath(); c.arc(0, -19, 7, 0, TAU); c.fill(); c.stroke();  // 头
+  c.beginPath(); c.moveTo(0, -26); c.lineTo(0, -32); c.stroke();  // 天线
+  c.beginPath(); c.arc(0, -34, 2.6, 0, TAU);
+  c.fillStyle = '#ff2f8e'; c.fill();
+  const sw = Math.sin(phase) * 5;
+  c.strokeStyle = '#a8f4ff';
+  c.beginPath();
+  c.moveTo(-2.5, 7); c.lineTo(-2.5 - sw, 15);
+  c.moveTo(2.5, 7);  c.lineTo(2.5 + sw, 15);
+  c.stroke();
+  c.restore();
+}
+
+function l1Finish(passed){
+  L1.on = false;
+  cancelAnimationFrame(L1.raf);
+  stats.walkDev = L1.dev;
+  stats.walkOffMs = Math.round(L1.offMs);
+  stats.walkMs = Math.round(L1.runMs);
+  stats.walkPassed = !!passed;
+  if(passed) stats.walkProgress = 1;
+  beep(passed ? 780 : 180, 0.35, passed ? 'triangle' : 'sawtooth', 0.08, passed ? 1180 : 120);
+
+  const sec = (stats.walkOffMs/1000).toFixed(1);
+  const body = passed
+    ? '你成功走到了终点。<br>走歪 <b>' + stats.walkDev + '</b> 次，累计出界 <b>' + sec + '</b> 秒，用时 <b>' + (stats.walkMs/1000).toFixed(1) + '</b> 秒。<br>'
+      + (stats.walkDev === 0 ? '系统检测到你的小脑似乎在正常运转。' : stats.walkDev < 4 ? '轻微晃动，属于「社交性微醺」。' : '小人已经不太听使唤了。')
+    : '时间耗尽，你卡在了 <b>' + Math.floor(stats.walkProgress*100) + '%</b> 的位置。<br>走歪 <b>' + stats.walkDev + '</b> 次。<br>体检中心的地板表示理解。';
+
+  showOverlay('PROJECT 01 · CLEARED', '走直线 · 体检结果', body, '进入第二项',
+    () => { show('scr-2'); l2Brief(); });
+}
+
+/* ============================================================
+   3. 关卡二：接酒杯
+   玩法：鼠标 / 手指控制底部篮子，接住下落物品。
+   规则：酒杯 +10，啤酒 +8（但加醉意），代码 -15 并触发屏幕故障抖动，猫 +25。
+   连击：每连续接住 5 个，得分倍率 +0.5，最高 x3。
+   ============================================================ */
+const L2 = {
+  cv:$('#cv2'), ctx:null, w:0, h:0, dpr:1,
+  raf:0, on:false, last:0, t:0,
+  items:[], parts:[], pops:[], rain:[],
+  basketX:0, basketW:96,
+  score:0, combo:0, bestCombo:0,
+  glasses:0, beers:0, codes:0, cats:0, missed:0,
+  spawnT:0, left:35000, LIMIT:35000,
+  shakeMag:0, shakeT:0, hitT:0, hitColor:'#31e8ff', basketPop:0
+};
+/* 下落物的种类配置（权重越大越常见） */
+const ITEM_TYPES = [
+  { id:'glass', weight:44, r:15, pts:10,  v:[135,215], color:'#31e8ff' },
+  { id:'beer',  weight:22, r:14, pts:8,   v:[120,195], color:'#ffc94a' },
+  { id:'code',  weight:24, r:15, pts:-15, v:[150,245], color:'#ff3b5c' },
+  { id:'cat',   weight:10, r:16, pts:25,  v:[110,175], color:'#c07cff' }
+];
+const ITEM_TOTAL = ITEM_TYPES.reduce((s,t) => s + t.weight, 0);
+
+function l2Resize(){
+  const o = fitCanvas(L2.cv);
+  L2.ctx = o.ctx; L2.w = o.w; L2.h = o.h; L2.dpr = o.dpr;
+  L2.basketW = clamp(L2.w * 0.17, 74, 118);
+  L2.basketX = clamp(L2.basketX || L2.w/2, L2.basketW/2, L2.w - L2.basketW/2);
+  L2.rain = [];
+  for(let i = 0; i < 46; i++){
+    L2.rain.push({ x:rnd(0,L2.w), y:rnd(0,L2.h), len:rnd(10,34), sp:rnd(140,420), a:rnd(.05,.22) });
+  }
+}
+
+function l2Brief(){
+  showOverlay('PROJECT 02 · BRIEFING', '接酒杯',
+    '移动鼠标或按住屏幕拖动，控制底部的篮子。<br>' +
+    '<b>酒杯 +10</b> · <b>啤酒 +8</b>（会增加醉意）· <b>猫 +25</b>（稀有）<br>' +
+    '<b style="color:#ff3b5c">代码 -15，并且会让屏幕发生故障抖动</b><br>' +
+    '连续接住 5 个，得分倍率会上升。限时 35 秒。',
+    '开始接酒', l2Start);
+}
+
+function l2Start(){
+  l2Resize();
+  L2.on = true; L2.last = 0; L2.t = 0;
+  L2.items = []; L2.parts = []; L2.pops = [];
+  L2.score = 0; L2.combo = 0; L2.bestCombo = 0;
+  L2.glasses = 0; L2.beers = 0; L2.codes = 0; L2.cats = 0; L2.missed = 0;
+  L2.spawnT = 0.35; L2.left = L2.LIMIT;
+  L2.shakeMag = 0; L2.shakeT = 0; L2.hitT = 0; L2.basketPop = 0;
+  $('#h2-score').textContent = '0';
+  $('#h2-combo').textContent = '0';
+  $('#h2-drunk').textContent = '0';
+  $('#h2-time').textContent = '35';
+  l2Resize();
+  L2.raf = requestAnimationFrame(l2Frame);
+}
+
+/* 按权重随机挑一种下落物 */
+function pickItemType(){
+  let r = Math.random() * ITEM_TOTAL;
+  for(let i = 0; i < ITEM_TYPES.length; i++){
+    r -= ITEM_TYPES[i].weight;
+    if(r <= 0) return ITEM_TYPES[i];
+  }
+  return ITEM_TYPES[0];
+}
+function spawnItem(){
+  const t = pickItemType();
+  L2.items.push({
+    type:t, r:t.r, x:rnd(t.r + 12, L2.w - t.r - 12), y:-30,
+    vy:rnd(t.v[0], t.v[1]), rot:rnd(-0.4,0.4), vr:rnd(-1.6,1.6), dead:false
+  });
+}
+function burst(x, y, color, n){
+  for(let i = 0; i < n; i++){
+    const a = rnd(0, TAU), s = rnd(40, 260);
+    L2.parts.push({ x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s - 40, life:rnd(.4,.9), t:0, color, r:rnd(1.5,3.6) });
+  }
+}
+function popup(x, y, text, color){ L2.pops.push({ x, y, text, color, t:0, life:0.95 }); }
+
+function l2Frame(ts){
+  if(!L2.on) return;
+  if(!L2.last) L2.last = ts;
+  const dt = Math.min(0.05, (ts - L2.last) / 1000);
+  L2.last = ts;
+  L2.t += dt;
+  L2.left -= dt * 1000;
+  if(L2.shakeT > 0) L2.shakeT -= dt;
+  if(L2.hitT > 0) L2.hitT -= dt;
+  if(L2.basketPop > 0) L2.basketPop -= dt;
+
+  /* 生成节奏随时间加快 */
+  L2.spawnT -= dt;
+  if(L2.spawnT <= 0){
+    const ramp = 1 - clamp(L2.left / L2.LIMIT, 0, 1);
+    L2.spawnT = lerp(0.62, 0.28, ramp) * rnd(0.75, 1.25);
+    spawnItem();
+    if(ramp > 0.55 && Math.random() < 0.35) spawnItem();   // 后期偶尔双发
+  }
+
+  const basketTop = L2.h - 64;
+
+  /* 更新下落物与接住判定 */
+  for(let i = 0; i < L2.items.length; i++){
+    const it = L2.items[i];
+    it.y += it.vy * dt;
+    it.rot += it.vr * dt;
+
+    const inBand = (it.y + it.r * 0.9 > basketTop) && (it.y - it.r < L2.h - 16);
+    const inX = Math.abs(it.x - L2.basketX) < L2.basketW / 2 + it.r * 0.55;
+    if(!it.dead && inBand && inX){
+      it.dead = true;
+      l2Catch(it);
+    }
+    /* 落到底部 */
+    if(!it.dead && it.y - it.r > L2.h + 8){
+      it.dead = true;
+      const id = it.type.id;
+      if(id === 'glass' || id === 'beer' || id === 'cat'){
+        L2.missed++;
+        if(id === 'glass'){ L2.combo = 0; $('#h2-combo').textContent = '0'; }
+      }
+    }
+  }
+  L2.items = L2.items.filter(it => !it.dead);
+
+  /* 粒子与飘字 */
+  for(const p of L2.parts){ p.t += dt; p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 420*dt; p.vx *= 0.99; }
+  L2.parts = L2.parts.filter(p => p.t < p.life);
+  for(const p of L2.pops){ p.t += dt; p.y -= 34*dt; }
+  L2.pops = L2.pops.filter(p => p.t < p.life);
+
+  /* 雨丝 */
+  for(const r of L2.rain){
+    r.y += r.sp * dt;
+    if(r.y > L2.h){ r.y = -r.len; r.x = rnd(0, L2.w); }
+  }
+
+  /* HUD */
+  $('#h2-score').textContent = L2.score;
+  $('#h2-time').textContent = Math.max(0, Math.ceil(L2.left / 1000));
+  $('#h2-drunk').textContent = Math.min(100, L2.beers * 3 + L2.codes * 5);
+
+  l2Render();
+
+  if(L2.left <= 0){ l2Finish(); return; }
+  L2.raf = requestAnimationFrame(l2Frame);
+}
+
+/* 接住一个物品：算分、特效、连击 */
+function l2Catch(it){
+  const id = it.type.id;
+  const mult = 1 + Math.min(2, Math.floor(L2.combo / 5) * 0.5);
+  const gain = Math.round(it.type.pts * (it.type.pts > 0 ? mult : 1));
+  L2.score = Math.max(0, L2.score + gain);
+  L2.basketPop = 0.18;
+
+  if(id === 'glass'){
+    L2.glasses++; L2.combo++; beep(760, 0.07, 'triangle', 0.05, 1040);
+    burst(it.x, it.y, '#31e8ff', 12); popup(it.x, it.y, '+' + gain, '#31e8ff');
+  }else if(id === 'beer'){
+    L2.beers++; L2.combo++; beep(320, 0.12, 'sawtooth', 0.05, 240);
+    burst(it.x, it.y, '#ffc94a', 14); popup(it.x, it.y, '+' + gain + ' 醉意+1', '#ffc94a');
+  }else if(id === 'cat'){
+    L2.cats++; L2.combo++; beep(980, 0.14, 'sine', 0.07, 1400);
+    burst(it.x, it.y, '#c07cff', 18); popup(it.x, it.y, '+25 喵!', '#c07cff');
+  }else{
+    // 代码：扣分 + 屏幕故障抖动
+    L2.codes++; L2.combo = 0;
+    burst(it.x, it.y, '#ff3b5c', 26);
+    popup(it.x, it.y, gain + ' 编译失败', '#ff3b5c');
+    L2.shakeMag = 26; L2.shakeT = 0.42;
+    L2.hitT = 0.4; L2.hitColor = '#ff3b5c';
+    beep(150, 0.28, 'square', 0.09, 60);
+    const stage = $('#stage2'), fl = $('#flash2');
+    stage.classList.remove('glitchfx'); void stage.offsetWidth; stage.classList.add('glitchfx');
+    fl.classList.add('on');
+    setTimeout(() => fl.classList.remove('on'), 170);
+    setTimeout(() => stage.classList.remove('glitchfx'), 1000);
+  }
+  L2.bestCombo = Math.max(L2.bestCombo, L2.combo);
+  $('#h2-combo').textContent = L2.combo;
+  $('#h2-score').textContent = L2.score;
+}
+
+function l2Render(){
+  const c = L2.ctx, w = L2.w, h = L2.h;
+  if(!c) return;
+  c.setTransform(L2.dpr,0,0,L2.dpr,0,0);
+  c.clearRect(0,0,w,h);
+
+  /* 屏幕抖动：代码命中时整块画布随机偏移并衰减 */
+  if(L2.shakeT > 0 && L2.shakeMag > 0.5){
+    const k = L2.shakeT / 0.42;
+    c.translate((Math.random()-0.5) * L2.shakeMag * k, (Math.random()-0.5) * L2.shakeMag * k);
+    L2.shakeMag *= 0.94;
+  }
+
+  /* 背景 */
+  const bg = c.createLinearGradient(0,0,0,h);
+  bg.addColorStop(0,'#0a0722'); bg.addColorStop(.6,'#060510'); bg.addColorStop(1,'#120726');
+  c.fillStyle = bg; c.fillRect(-40,-40,w+80,h+80);
+
+  /* 远处霓虹城市剪影 */
+  c.save();
+  c.globalAlpha = 0.85;
+  const seedShapes = [[0.03,60],[0.10,110],[0.17,74],[0.25,140],[0.34,90],[0.44,150],[0.55,86],[0.63,124],[0.72,70],[0.81,132],[0.9,96]];
+  for(let i = 0; i < seedShapes.length; i++){
+    const [px, ph] = seedShapes[i];
+    const bw = w * 0.075;
+    c.fillStyle = 'rgba(24,14,56,.85)';
+    c.fillRect(w*px, h - 90 - ph, bw, ph + 90);
+    c.strokeStyle = i % 2 ? 'rgba(49,232,255,.35)' : 'rgba(160,108,255,.4)';
+    c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(w*px, h - 90 - ph); c.lineTo(w*px + bw, h - 90 - ph); c.stroke();
+  }
+  c.restore();
+
+  /* 雨丝 */
+  c.save();
+  c.lineWidth = 1;
+  for(const r of L2.rain){
+    c.strokeStyle = 'rgba(160,200,255,' + r.a.toFixed(3) + ')';
+    c.beginPath(); c.moveTo(r.x, r.y); c.lineTo(r.x - 2, r.y + r.len); c.stroke();
+  }
+  c.restore();
+
+  /* 地面网格线 */
+  c.strokeStyle = 'rgba(160,108,255,.22)'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(0, h - 16); c.lineTo(w, h - 16); c.stroke();
+
+  /* 下落物 */
+  for(const it of L2.items){
+    const id = it.type.id;
+    c.save();
+    c.translate(it.x, it.y);
+    c.rotate(it.rot);
+    if(id === 'glass')      drawGlass(c, it.r, it.type.color);
+    else if(id === 'beer')  drawBeer(c, it.r, it.type.color);
+    else if(id === 'code')  drawCode(c, it.r, it.type.color);
+    else                    drawCat(c, it.r, it.type.color);
+    c.restore();
+  }
+
+  /* 粒子 */
+  for(const p of L2.parts){
+    const a = 1 - p.t / p.life;
+    c.globalAlpha = Math.max(0, a);
+    c.fillStyle = p.color;
+    c.beginPath(); c.arc(p.x, p.y, p.r * (0.4 + a * 0.8), 0, TAU); c.fill();
+  }
+  c.globalAlpha = 1;
+
+  /* 篮子 */
+  const bx = L2.basketX, by = h - 60;
+  const bw2 = L2.basketW / 2 + (L2.basketPop > 0 ? 7 : 0);
+  c.save();
+  c.shadowColor = '#31e8ff'; c.shadowBlur = 22;
+  c.strokeStyle = '#9beeff'; c.lineWidth = 3;
+  c.beginPath();
+  c.moveTo(bx - bw2, by);
+  c.lineTo(bx - bw2 * 0.78, by + 38);
+  c.lineTo(bx + bw2 * 0.78, by + 38);
+  c.lineTo(bx + bw2, by);
+  c.stroke();
+  /* 篮子网格 */
+  c.shadowBlur = 0; c.lineWidth = 1.2;
+  c.strokeStyle = 'rgba(49,232,255,.5)';
+  c.beginPath();
+  for(let i = 1; i <= 3; i++){
+    const yy = by + i * 9.5;
+    const k2 = 1 - i * 0.075;
+    c.moveTo(bx - bw2 * k2, yy); c.lineTo(bx + bw2 * k2, yy);
+  }
+  for(let i = -2; i <= 2; i++){
+    c.moveTo(bx + i * bw2 * 0.4, by);
+    c.lineTo(bx + i * bw2 * 0.34, by + 38);
+  }
+  c.stroke();
+  /* 篮口高亮 */
+  c.strokeStyle = '#ff2f8e'; c.lineWidth = 3; c.shadowColor = '#ff2f8e'; c.shadowBlur = 16;
+  c.beginPath(); c.moveTo(bx - bw2, by); c.lineTo(bx + bw2, by); c.stroke();
+  c.restore();
+
+  /* 飘字 */
+  for(const p of L2.pops){
+    const a = clamp(1 - p.t / p.life, 0, 1);
+    c.globalAlpha = a;
+    c.fillStyle = p.color;
+    c.font = 'bold 16px ui-monospace,monospace';
+    c.textAlign = 'center';
+    c.shadowColor = p.color; c.shadowBlur = 14;
+    c.fillText(p.text, p.x, p.y);
+    c.shadowBlur = 0; c.globalAlpha = 1;
+  }
+
+  /* 连击提示 */
+  if(L2.combo >= 5){
+    c.save();
+    c.fillStyle = 'rgba(49,232,255,.9)';
+    c.font = 'bold 15px ui-monospace,monospace';
+    c.textAlign = 'center';
+    c.fillText('COMBO x' + (1 + Math.min(2, Math.floor(L2.combo / 5) * 0.5)).toFixed(1) + '  (' + L2.combo + ')', w/2, 26);
+    c.restore();
+  }
+}
+
+/* 霓虹酒杯 */
+function drawGlass(c, r, col){
+  c.strokeStyle = col; c.lineWidth = 2.4; c.shadowColor = col; c.shadowBlur = 14;
+  c.beginPath();
+  c.moveTo(-r, -r); c.lineTo(r, -r); c.lineTo(r * 0.36, r * 0.4); c.lineTo(-r * 0.36, r * 0.4);
+  c.closePath(); c.stroke();
+  c.fillStyle = 'rgba(49,232,255,.30)';
+  c.beginPath();
+  c.moveTo(-r * 0.76, -r * 0.74); c.lineTo(r * 0.76, -r * 0.74); c.lineTo(r * 0.34, r * 0.2); c.lineTo(-r * 0.34, r * 0.2);
+  c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(0, r * 0.4); c.lineTo(0, r * 0.85);
+  c.moveTo(-r * 0.62, r * 0.85); c.lineTo(r * 0.62, r * 0.85);
+  c.stroke();
+  c.shadowBlur = 0;
+}
+/* 霓虹啤酒瓶 */
+function drawBeer(c, r, col){
+  c.strokeStyle = col; c.lineWidth = 2.2; c.shadowColor = col; c.shadowBlur = 14;
+  rr(c, -r * 0.62, -r * 0.35, r * 1.24, r * 1.5, r * 0.32); c.stroke();
+  c.beginPath(); c.moveTo(-r * 0.24, -r * 0.35); c.lineTo(-r * 0.24, -r * 0.9);
+  c.lineTo(r * 0.24, -r * 0.9); c.lineTo(r * 0.24, -r * 0.35); c.stroke();
+  c.fillStyle = 'rgba(255,201,74,.55)';
+  c.beginPath(); c.arc(-r * 0.2, -r * 1.06, r * 0.2, 0, TAU); c.fill();
+  c.beginPath(); c.arc(r * 0.14, -r * 1.14, r * 0.16, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,201,74,.22)';
+  rr(c, -r * 0.44, r * 0.15, r * 0.88, r * 0.85, r * 0.22); c.fill();
+  c.shadowBlur = 0;
+}
+/* 代码方块 */
+function drawCode(c, r, col){
+  c.fillStyle = 'rgba(255,59,92,.18)';
+  c.strokeStyle = col; c.lineWidth = 2.2; c.shadowColor = col; c.shadowBlur = 15;
+  rr(c, -r, -r * 0.82, r * 2, r * 1.64, 4); c.fill(); c.stroke();
+  c.shadowBlur = 0;
+  c.fillStyle = col;
+  c.font = 'bold ' + Math.round(r * 0.82) + 'px ui-monospace,monospace';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('</>', 0, 1);
+  c.textBaseline = 'alphabetic';
+}
+/* 霓虹猫 */
+function drawCat(c, r, col){
+  c.strokeStyle = col; c.lineWidth = 2.2; c.shadowColor = col; c.shadowBlur = 14;
+  c.beginPath(); c.arc(0, r * 0.1, r * 0.72, 0, TAU); c.stroke();
+  c.beginPath();
+  c.moveTo(-r * 0.62, -r * 0.3); c.lineTo(-r * 0.34, -r * 0.86); c.lineTo(-r * 0.08, -r * 0.36);
+  c.moveTo(r * 0.62, -r * 0.3);  c.lineTo(r * 0.34, -r * 0.86);  c.lineTo(r * 0.08, -r * 0.36);
+  c.stroke();
+  c.fillStyle = col;
+  c.beginPath(); c.arc(-r * 0.24, 0, r * 0.11, 0, TAU); c.fill();
+  c.beginPath(); c.arc(r * 0.24, 0, r * 0.11, 0, TAU); c.fill();
+  c.lineWidth = 1.2;
+  c.beginPath();
+  c.moveTo(-r * 0.2, r * 0.42); c.lineTo(-r * 1.05, r * 0.28);
+  c.moveTo(-r * 0.2, r * 0.52); c.lineTo(-r * 1.05, r * 0.58);
+  c.moveTo(r * 0.2, r * 0.42);  c.lineTo(r * 1.05, r * 0.28);
+  c.moveTo(r * 0.2, r * 0.52);  c.lineTo(r * 1.05, r * 0.58);
+  c.stroke();
+  c.shadowBlur = 0;
+}
+
+function l2Finish(){
+  L2.on = false;
+  cancelAnimationFrame(L2.raf);
+  stats.score = L2.score;
+  stats.bestCombo = L2.bestCombo;
+  stats.glasses = L2.glasses; stats.beers = L2.beers;
+  stats.codes = L2.codes; stats.cats = L2.cats; stats.missed = L2.missed;
+  beep(520, 0.4, 'triangle', 0.08, 880);
+
+  const body =
+    '最终得分 <b>' + L2.score + '</b>，最高连击 <b>' + L2.bestCombo + '</b>。<br>' +
+    '酒杯 <b>' + L2.glasses + '</b> · 啤酒 <b>' + L2.beers + '</b> · 猫 <b>' + L2.cats + '</b> · 误接代码 <b>' + L2.codes + '</b> · 漏接 <b>' + L2.missed + '</b><br>' +
+    (L2.codes >= 5 ? '你一共把 ' + L2.codes + ' 段代码灌进了篮子，系统内核对此表示强烈抗议。'
+      : L2.cats >= 3 ? '你对猫的捕获率高得不像醉汉，怀疑你是借着酒劲撸猫。'
+      : L2.score > 300 ? '手速惊人，酒杯在你的篮子里排队。'
+      : '篮子表示：它尽力了。');
+
+  showOverlay('PROJECT 02 · CLEARED', '接酒杯 · 体检结果', body, '进入第三项',
+    () => { show('scr-3'); l3Brief(); });
+}
+
+/* ============================================================
+   4. 关卡三：读绕口令
+   玩法：文字逐轮变得更扭曲、更模糊、更变色，扭曲速度也逐级加快。
+   用户在心里默读，读得下去就点「我还能读」；超时未点即判定读不动。
+   ============================================================ */
+const L3 = {
+  on:false, raf:0, t:0, last:0,
+  spans:[], round:0, maxRound:8,
+  limit:7000, limitT:7000, reactList:[], lastReact:0,
+  texts:[
+    '黑化肥发灰会挥发，灰化肥挥发会发黑。',
+    '四是四，十是十，十四是十四，四十是四十。',
+    '红鲤鱼与绿鲤鱼与驴，吕小绿养红鲤，李小绿养绿鲤。',
+    '八百标兵奔北坡，炮兵并排北边跑，炮兵怕把标兵碰。'
+  ]
+};
+const L3_LIMITS = [7000, 6000, 5200, 4600, 4000, 3500, 3100, 2800];
+
+function l3Brief(){
+  showOverlay('PROJECT 03 · BRIEFING', '读绕口令',
+    '屏幕上的绕口令会越来越扭曲、模糊、变色，扭曲速度逐级加快。<br>' +
+    '请在<b>心里默读</b>，读得下去就点「我还能读」。<br>' +
+    '每一轮都有时间限制，超时即视为「读不动了」，本项结束。<br>' +
+    '最高 8 轮。',
+    '我准备好了', l3Start);
+}
+
+function l3Start(){
+  L3.on = true; L3.t = 0; L3.last = 0; L3.round = 0;
+  L3.reactList = []; L3.lastReact = 0;
+  $('#h3-round').textContent = '0';
+  $('#h3-lv').textContent = '1';
+  $('#btn-read').style.transform = 'none';
+  $('#btn-giveup').classList.remove('hidden');
+  l3Round();
+  L3.raf = requestAnimationFrame(l3Frame);
+}
+
+/* 开始新一轮：重建字符 span，重置计时 */
+function l3Round(){
+  L3.round++;
+  $('#h3-round').textContent = String(L3.round - 1);
+  $('#h3-lv').textContent = String(L3.round);
+  const txt = L3.texts[(L3.round - 1) % L3.texts.length];
+  const wrap = $('#twister');
+  wrap.innerHTML = '';
+  L3.spans = [];
+  const chars = Array.from ? Array.from(txt) : txt.split('');
+  for(let i = 0; i < chars.length; i++){
+    const s = document.createElement('span');
+    s.textContent = chars[i];
+    if(chars[i] === '，' || chars[i] === '。') s.className = 'punc';
+    wrap.appendChild(s);
+    L3.spans.push(s);
+  }
+  L3.limit = L3_LIMITS[Math.min(L3.round - 1, L3_LIMITS.length - 1)];
+  L3.limitT = L3.limit;
+  L3.lastReact = 0;
+  /* 按钮随难度轻微漂移，增加一点点荒诞感（仍然点得到） */
+  const drift = Math.min((L3.round - 1) * 2.4, 15);
+  $('#btn-read').style.transform = 'translate(' + ((L3.round % 2 ? 1 : -1) * drift) + 'px,' + (-drift * 0.45) + 'px)';
+  beep(420 + L3.round * 40, 0.08, 'triangle', 0.045);
+}
+
+function l3Frame(ts){
+  if(!L3.on) return;
+  if(!L3.last) L3.last = ts;
+  const dt = Math.min(0.05, (ts - L3.last) / 1000);
+  L3.last = ts;
+  L3.limitT -= dt * 1000;
+
+  /* 扭曲速度逐级加快：轮次越高，时间流逝越快 */
+  L3.t += dt * (1 + (L3.round - 1) * 0.38);
+
+  /* 扭曲强度：轮次 + 本轮已流逝比例，双重递增 */
+  const k = 0.20 + (L3.round - 1) * 0.155 + (1 - clamp(L3.limitT / L3.limit, 0, 1)) * 0.34;
+  const spans = L3.spans;
+  for(let i = 0; i < spans.length; i++){
+    const s = spans[i];
+    const ph = i * 0.55 + L3.round * 1.7;
+    const amp = 4 + k * 30;
+    const tx = Math.sin(L3.t * 2.2 + ph) * amp;
+    const ty = Math.cos(L3.t * 1.8 + ph * 1.3) * amp * 0.55;
+    const rot = Math.sin(L3.t * 1.4 + ph) * k * 26;
+    const sc = 1 + Math.sin(L3.t * 2.9 + ph) * k * 0.25;
+    const bl = Math.min(3.4, k * 2.4 * Math.abs(Math.sin(L3.t * 1.1 + ph * 0.7)));
+    const hue = (L3.t * 90 + i * 13) % 360;
+    s.style.transform = 'translate3d(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px,0) rotate(' + rot.toFixed(1) + 'deg) scale(' + sc.toFixed(3) + ')';
+    s.style.filter = 'blur(' + bl.toFixed(2) + 'px) hue-rotate(' + hue.toFixed(0) + 'deg)';
+    s.style.opacity = (1 - Math.min(0.35, k * 0.25 * Math.abs(Math.sin(L3.t * 0.9 + i)))).toFixed(2);
+  }
+
+  const p = clamp(L3.limitT / L3.limit, 0, 1);
+  $('#bar3').style.width = (p * 100).toFixed(1) + '%';
+
+  if(L3.limitT <= 0){ l3Finish(false); return; }
+  L3.raf = requestAnimationFrame(l3Frame);
+}
+
+/* 点「我还能读」 */
+$('#btn-read').addEventListener('click', () => {
+  if(!L3.on) return;
+  const used = L3.limit - L3.limitT;
+  L3.reactList.push(Math.round(used));
+  stats.reactList = L3.reactList.slice();
+  beep(680 + L3.round * 70, 0.1, 'triangle', 0.06);
+  if(L3.round >= L3.maxRound){ l3Finish(true); return; }
+  l3Round();
+});
+/* 主动认输 */
+$('#btn-giveup').addEventListener('click', () => { if(L3.on) l3Finish(false); });
+
+function l3Finish(perfect){
+  L3.on = false;
+  cancelAnimationFrame(L3.raf);
+  /* 成功轮数：全部读完则等于 maxRound，否则是「点过按钮的轮数」 */
+  const done = perfect ? L3.maxRound : Math.max(0, L3.round - 1);
+  stats.rounds = done;
+  stats.readPerfect = !!perfect;
+  stats.reactList = L3.reactList.slice(0, done);
+  /* 清掉扭曲，避免残影 */
+  for(const s of L3.spans){ s.style.transform = 'none'; s.style.filter = 'none'; s.style.opacity = '1'; }
+  beep(perfect ? 880 : 200, 0.35, perfect ? 'triangle' : 'sawtooth', 0.08, perfect ? 1320 : 130);
+
+  const avg = stats.reactList.length
+    ? Math.round(stats.reactList.reduce((a,b) => a+b, 0) / stats.reactList.length)
+    : 0;
+  const body =
+    '成功读到第 <b>' + done + '</b> 轮' + (perfect ? '（全部读完，语言中枢完好）' : '（时间到，舌头已打结）') + '。<br>' +
+    (avg ? '平均每轮反应 <b>' + avg + '</b> 毫秒。' : '系统没有采集到任何一次有效阅读。') + '<br>' +
+    (done >= 7 ? '你的舌头比代码还稳定。'
+      : done >= 4 ? '吐字还算清晰，属于「能打包回家的醉」。'
+      : done >= 1 ? '已经开始出现「说话像在加载」的症状。'
+      : '你连第一句都没撑过去，舌头已经进入只读模式。');
+
+  showOverlay('PROJECT 03 · CLEARED', '读绕口令 · 体检结果', body, '生成鉴定报告',
+    () => { generateReport(); });
+}
+
+/* ============================================================
+   5. 报告生成：五项指标 + 称号判定 + 雷达图
+   ============================================================ */
+let RADAR = null;
+
+function computeMetrics(){
+  const s = stats;
+  const avgReact = s.reactList.length
+    ? s.reactList.reduce((a,b) => a+b, 0) / s.reactList.length : 0;
+
+  /* 清醒度：走歪次数 + 出界时长 + 是否走到终点 */
+  const sober = clamp(100 - s.walkDev * 9 - (s.walkOffMs / 1000) * 3.5 - (s.walkPassed ? 0 : 16), 0, 100);
+
+  /* 手速：接酒杯得分（含连击加成） */
+  const speed = clamp(s.score * 0.20, 0, 100);
+
+  /* 语言能力：绕口令轮数 + 反应速度 + 满分加成 */
+  const reactBonus = avgReact > 0 ? clamp(20 - avgReact / 300, 0, 20) : 0;
+  const lang = clamp(s.rounds * 11 + reactBonus + (s.readPerfect ? 10 : 0), 0, 100);
+
+  /* 玄学体质：由真实操作数据派生的确定性「哈希」（同样的表现永远得到同样的分数，不是随机数） */
+  const seedRaw = Math.sin(s.walkDev * 12.9898 + s.cats * 78.233 + s.rounds * 37.719
+                        + s.beers * 4.77 + s.codes * 9.13 + (avgReact || 900) * 0.013) * 43758.5453;
+  const frac = seedRaw - Math.floor(seedRaw);
+  const mystic = clamp(18 + frac * 66 + s.cats * 3.5, 0, 100);
+
+  /* 酒量：喝得越多还站得住，酒量越好 */
+  const tol = clamp(24 + s.beers * 7 + s.rounds * 3.5 + (s.walkPassed ? 14 : 0)
+                    + s.glasses * 0.3 - s.codes * 3, 0, 100);
+
+  /* 综合醉度：五项加权后的反向指标 */
+  const core = sober * 0.38 + speed * 0.20 + lang * 0.22 + tol * 0.20;
+  const drunk = clamp(100 - core * 1.15 + (mystic - 50) * 0.12, 0, 100);
+
+  return { sober, speed, lang, mystic, tol, drunk, avgReact };
+}
+
+/* ------- 20 种称号：每个称号用「与本次表现贴合度」打分，取最高分者（确定性，非随机） ------- */
+const TITLES = [
+  { n:'赛博醒酒中心名誉主任', tag:'清醒得让人怀疑人生',
+    s:(m)=> m.sober * 1.15 + m.lang * 0.35 + m.speed * 0.35 - 55,
+    c:(m,s)=> '走直线只歪了 ' + s.walkDev + ' 次，绕口令扛到第 ' + s.rounds + ' 轮。系统怀疑你根本没喝，只是借体检之名来蹭免费酒杯。' },
+
+  { n:'清醒的赛博诗人', tag:'微醺，但文采飞扬',
+    s:(m)=> m.sober * 0.9 + m.lang * 0.95 - 48,
+    c:(m,s)=> '脚步稳、舌头更稳。你在霓虹小路上走得像个抒情散文，读绕口令的时候还顺便押上了韵。' },
+
+  { n:'霓虹走钢丝大师', tag:'小脑今日运转良好',
+    s:(m,s)=> (s.walkPassed && s.walkDev <= 1 ? 62 : -6) + m.sober * 0.25,
+    c:(m,s)=> '全程走歪 ' + s.walkDev + ' 次，你沿着霓虹小路走出了一种优雅。体检中心的扫地机器人已对你发起关注。' },
+
+  { n:'二进制微醺侠', tag:'0 和 1 之间摇摆',
+    s:(m)=> 46 - (Math.abs(m.sober-55) + Math.abs(m.lang-55) + Math.abs(m.tol-55)) * 0.5,
+    c:(m,s)=> '各项表现都停在「还行」的甜蜜区：走歪 ' + s.walkDev + ' 次、得分 ' + s.score + '、读到第 ' + s.rounds + ' 轮。你不是醉了，你是被酒精均匀涂抹了一遍。' },
+
+  { n:'内存溢出型醉汉', tag:'大脑已进入 swap 分区',
+    s:(m)=> m.drunk * 0.9 + (100 - m.sober) * 0.35 - 62,
+    c:(m,s)=> '出界 ' + (s.walkOffMs/1000).toFixed(1) + ' 秒、误接代码 ' + s.codes + ' 次、绕口令撑到第 ' + s.rounds + ' 轮。你的短期记忆已经被操作系统回收了。' },
+
+  { n:'显卡烧毁型酒神', tag:'帧率随酒精度飙升',
+    s:(m,s)=> (s.score >= 260 ? 42 : -8) + m.speed * 0.55,
+    c:(m,s)=> '接酒杯拿下 <b>' + s.score + '</b> 分、最高连击 ' + s.bestCombo + '。检测到你的手比脑子快大约 300 毫秒。' },
+
+  { n:'绕口令永动机', tag:'舌头自带无限循环',
+    s:(m,s)=> (s.rounds >= 7 ? 50 : s.rounds * 4) + m.lang * 0.4 - 20,
+    c:(m,s)=> '连读 ' + s.rounds + ' 轮不卡壳，平均反应 ' + Math.round(m.avgReact) + ' 毫秒。建议把你接入城市语音广播系统。' },
+
+  { n:'电子木鱼敲击者', tag:'醉得不响，但很稳',
+    s:(m,s)=> (s.codes === 0 && s.walkDev <= 3 ? 24 : 0) + m.tol * 0.35 + (100 - m.mystic) * 0.15 - 26,
+    c:(m,s)=> '没有误接任何一段代码，走歪 ' + s.walkDev + ' 次，情绪稳定得像一台在念经的服务器。' },
+
+  { n:'三杯倒型固态硬盘', tag:'容量很大，抗性很小',
+    s:(m)=> (100 - m.tol) * 0.85 - 20,
+    c:(m,s)=> '只接了 ' + s.beers + ' 瓶啤酒，酒量评分就掉到了 ' + Math.round(m.tol) + '。你的酒精缓冲区只有 256KB。' },
+
+  { n:'酒后代码重构师', tag:'醉着也能改需求',
+    s:(m,s)=> (s.codes >= 3 ? 30 : 0) + m.speed * 0.4 + (100 - m.lang) * 0.2 - 34,
+    c:(m,s)=> '误接代码 ' + s.codes + ' 次还拿下了 ' + s.score + ' 分。你把扣分项当成了功能，这就是资深工程师。' },
+
+  { n:'酒精驱动的量子态', tag:'清醒与醉酒同时成立',
+    s:(m)=> m.mystic * 0.95 - 44,
+    c:(m,s)=> '玄学体质 <b>' + Math.round(m.mystic) + '</b>。你的走位在被观测前既歪又不歪，绕口令在你嘴里既是绕口令又是诗。' },
+
+  { n:'猫毛过敏型调酒师', tag:'主业撸猫，副业喝酒',
+    s:(m,s)=> (s.cats >= 3 ? 44 : s.cats * 9) + m.mystic * 0.15 - 24,
+    c:(m,s)=> '在满屏坠物里精准接住 <b>' + s.cats + '</b> 只猫。系统判定你的视觉注意力已经完全跑偏，但我们尊重这个选择。' },
+
+  { n:'举杯邀明月的赛博李白', tag:'酒量深不见底',
+    s:(m,s)=> (s.beers >= 7 ? 40 : s.beers * 4) + m.tol * 0.45 - 32,
+    c:(m,s)=> '一口气干了 ' + s.beers + ' 瓶啤酒，酒量评分仍有 ' + Math.round(m.tol) + '。你的肝脏大概是外接水冷。' },
+
+  { n:'服务器宕机型醉猫', tag:'内核已 panic',
+    s:(m,s)=> (s.codes >= 4 ? 38 : 0) + (100 - m.sober) * 0.3 - 30,
+    c:(m,s)=> '屏幕为你抖了 ' + s.codes + ' 次。寄存器里的状态是：ERROR，原因未知，建议重启人类。' },
+
+  { n:'数据流里的不倒翁', tag:'怎么推都还能站',
+    s:(m)=> (m.tol > 70 ? 32 : 0) + m.tol * 0.45 - 42,
+    c:(m,s)=> '酒量评分 <b>' + Math.round(m.tol) + '</b>，醉意指数只有 ' + Math.round(m.drunk) + '。别人在体检，你在做压力测试。' },
+
+  { n:'模糊文本鉴赏家', tag:'模糊即艺术',
+    s:(m,s)=> (m.avgReact > 0 && m.avgReact < 1400 ? 40 : 0) + m.lang * 0.3 - 22,
+    c:(m,s)=> '平均 ' + Math.round(m.avgReact) + ' 毫秒读完一轮扭曲文字。你不是读得快，你是根本不需要看清。' },
+
+  { n:'五维醉酒观测者', tag:'均衡得毫无破绽',
+    s:(m)=>{
+      const arr = [m.sober, m.speed, m.lang, m.mystic, m.tol];
+      const mean = arr.reduce((a,b)=>a+b,0) / 5;
+      const dev = arr.reduce((a,b)=>a+Math.abs(b-mean),0) / 5;
+      return 40 - dev * 0.9 + mean * 0.15;
+    },
+    c:(m,s)=> '五项指标几乎齐平，像被同一瓶酒均匀灌过。系统认为你是一个发展全面的醉汉。' },
+
+  { n:'走位飘忽的醉侠', tag:'路线由风决定',
+    s:(m,s)=> (s.walkDev >= 8 ? 42 : s.walkDev * 4) - 18,
+    c:(m,s)=> '走歪 <b>' + s.walkDev + '</b> 次，霓虹小路在你脚下变成了抽象画。终点其实一直在你旁边。' },
+
+  { n:'霓虹下的醉步舞者', tag:'歪得有节奏感',
+    s:(m,s)=> (s.walkDev >= 3 && s.walkDev <= 8 && s.score >= 150 ? 36 : 0) + m.speed * 0.35 - 26,
+    c:(m,s)=> '走歪 ' + s.walkDev + ' 次却拿下 ' + s.score + ' 分。你不是在走直线，你是在跳一支赛博探戈。' },
+
+  { n:'深夜售货机前的哲学家', tag:'手慢，但想得多',
+    s:(m)=> (100 - m.speed) * 0.5 + m.mystic * 0.4 - 40,
+    c:(m,s)=> '只拿到 ' + s.score + ' 分，玄学体质却高达 ' + Math.round(m.mystic) + '。你接的不是酒杯，是对人生的思考。' },
+
+  /* 兜底称号：当以上条件都不贴合时使用 */
+  { n:'赛博酒精观测样本', tag:'数据已归档，感谢配合',
+    s:()=> 1,
+    c:(m,s)=> '走歪 ' + s.walkDev + ' 次、得分 ' + s.score + '、读到第 ' + s.rounds + ' 轮。你的数据已被存入醉酒样本库，编号 ' + (1000 + Math.round(m.drunk)) + '。' }
+];
+
+/* 醉度等级描述 */
+const BANDS = [
+  { max:12,  label:'清醒得可疑 · 疑似代驾' },
+  { max:28,  label:'微醺 · 社交润滑状态' },
+  { max:45,  label:'中度 · 开始说真心话' },
+  { max:62,  label:'重度 · 把路灯认成老友' },
+  { max:80,  label:'极重度 · 头已经贴在键盘上' },
+  { max:101, label:'酒精人形自走体 · 建议直接送修' }
+];
+
+function generateReport(){
+  const m = computeMetrics();
+  stats.__m = m;
+
+  /* --- 称号判定：对所有称号打分，取最高分（同样表现必然得到同样称号） --- */
+  let best = TITLES[TITLES.length - 1], bestScore = -Infinity;
+  for(const t of TITLES){
+    const sc = t.s(m, stats);
+    if(sc > bestScore){ bestScore = sc; best = t; }
+  }
+  const band = BANDS.find(b => m.drunk < b.max) || BANDS[BANDS.length - 1];
+  const lv = Math.min(9, 1 + Math.floor(m.drunk / 11));
+
+  /* --- 填充报告 DOM --- */
+  show('scr-r');
+  $('#r-serial').textContent = '#' + String(1000 + ((Date.now() % 8000) | 0));
+  $('#r-title').textContent = best.n;
+  $('#r-tag').textContent = '『 ' + best.tag + ' 』 · 醉度区间：' + band.label;
+  $('#r-comment').innerHTML = '<b style="color:#31e8ff">鉴定评语：</b>' + best.c(m, stats) +
+    '<br><br>本次体检共采集到 <b>' + (stats.walkDev + stats.glasses + stats.beers + stats.codes + stats.cats + stats.rounds) +
+    '</b> 条有效行为数据，其中 <b>' + Math.round(m.mystic) + '%</b> 的数据无法被现有物理学解释。';
+
+  /* 五项指标条 */
+  const bars = [
+    ['清醒度', m.sober,   '走歪 ' + stats.walkDev + ' 次 / 出界 ' + (stats.walkOffMs/1000).toFixed(1) + 's'],
+    ['手速',   m.speed,   '接酒杯得分 ' + stats.score],
+    ['语言能力', m.lang,  '绕口令 ' + stats.rounds + ' 轮 / 均值 ' + Math.round(m.avgReact) + 'ms'],
+    ['玄学体质', m.mystic, '由真实操作数据派生'],
+    ['酒量',   m.tol,     '啤酒 ' + stats.beers + ' 瓶 / 酒杯 ' + stats.glasses + ' 个']
+  ];
+  const box = $('#r-bars');
+  box.innerHTML = '';
+  bars.forEach(function(row){
+    const d = document.createElement('div');
+    d.className = 'rbar';
+    d.innerHTML = '<div class="k"><span>' + row[0] + '</span><b>' + Math.round(row[1]) + ' / 100</b></div>' +
+                  '<div class="t"><i></i></div>' +
+                  '<div class="k" style="margin:4px 0 0"><span style="opacity:.75">' + row[2] + '</span></div>';
+    box.appendChild(d);
+    setTimeout(() => { d.querySelector('.t>i').style.width = row[1].toFixed(1) + '%'; }, 80);
+  });
+
+  /* 原始数据 */
+  const raw = [
+    ['走歪次数', stats.walkDev + ' 次'],
+    ['走直线完成度', Math.round(stats.walkProgress * 100) + '%'],
+    ['接住酒杯', stats.glasses + ' 个'],
+    ['灌下啤酒', stats.beers + ' 瓶'],
+    ['误接代码', stats.codes + ' 次'],
+    ['抓到的猫', stats.cats + ' 只'],
+    ['漏接物品', stats.missed + ' 个'],
+    ['最高连击', 'x' + stats.bestCombo],
+    ['绕口令轮数', stats.rounds + ' / 8'],
+    ['平均反应', Math.round(m.avgReact) + ' ms']
+  ];
+  const rawBox = $('#r-raw');
+  rawBox.innerHTML = '';
+  raw.forEach(function(r){
+    const d = document.createElement('div');
+    d.className = 'raw';
+    d.innerHTML = r[0] + '<b>' + r[1] + '</b>';
+    rawBox.appendChild(d);
+  });
+
+  $('#r-level').textContent = 'Lv.' + lv;
+  setTimeout(() => { $('#r-drunkbar').style.width = m.drunk.toFixed(1) + '%'; }, 100);
+
+  /* 雷达图（带绘制动画） */
+  RADAR = {
+    values:[
+      { k:'清醒度',   v:m.sober  },
+      { k:'手速',     v:m.speed  },
+      { k:'语言能力', v:m.lang   },
+      { k:'玄学体质', v:m.mystic },
+      { k:'酒量',     v:m.tol    }
+    ], start:0
+  };
+  drawRadar(0);
+  requestAnimationFrame(function anim(ts){
+    if(!RADAR) return;
+    if(!RADAR.start) RADAR.start = ts;
+    const p = clamp((ts - RADAR.start) / 850, 0, 1);
+    drawRadar(easeOut(p));
+    if(p < 1) requestAnimationFrame(anim);
+  });
+  beep(660, 0.3, 'triangle', 0.07, 990);
+}
+
+/* 绘制五维雷达图 */
+function drawRadar(anim){
+  const cv = $('#cvR');
+  const o = fitCanvas(cv);
+  const c = o.ctx, w = o.w, h = o.h;
+  c.setTransform(o.dpr,0,0,o.dpr,0,0);
+  c.clearRect(0,0,w,h);
+  if(!RADAR) return;
+
+  const cx = w / 2, cy = h / 2 + 6;
+  const R = Math.max(44, Math.min(w / 2 - 48, h / 2 - 34));
+  const n = RADAR.values.length;
+
+  /* 底盘网格 */
+  for(let ring = 4; ring >= 1; ring--){
+    const rr2 = R * ring / 4;
+    c.beginPath();
+    for(let i = 0; i <= n; i++){
+      const a = -Math.PI/2 + i * TAU / n;
+      const x = cx + Math.cos(a) * rr2, y = cy + Math.sin(a) * rr2;
+      i ? c.lineTo(x,y) : c.moveTo(x,y);
+    }
+    c.closePath();
+    c.strokeStyle = ring === 4 ? 'rgba(160,108,255,.55)' : 'rgba(160,108,255,.22)';
+    c.lineWidth = ring === 4 ? 1.6 : 1;
+    c.stroke();
+    if(ring === 4){ c.fillStyle = 'rgba(160,108,255,.06)'; c.fill(); }
+  }
+  /* 轴线 + 标签 */
+  c.save();
+  for(let i = 0; i < n; i++){
+    const a = -Math.PI/2 + i * TAU / n;
+    const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+    c.strokeStyle = 'rgba(49,232,255,.30)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
+
+    const lx = cx + Math.cos(a) * (R + 34);
+    const ly = cy + Math.sin(a) * (R + 22);
+    c.fillStyle = '#dfe6ff';
+    c.font = 'bold 12.5px ' + getComputedStyle(document.body).fontFamily;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(RADAR.values[i].k, lx, ly - 7);
+    c.fillStyle = '#31e8ff';
+    c.font = 'bold 14px ui-monospace,monospace';
+    c.fillText(String(Math.round(RADAR.values[i].v)), lx, ly + 9);
+  }
+  c.restore();
+
+  /* 数据多边形 */
+  c.save();
+  c.beginPath();
+  for(let i = 0; i <= n; i++){
+    const idx = i % n;
+    const a = -Math.PI/2 + idx * TAU / n;
+    const rv = R * clamp(RADAR.values[idx].v / 100 * anim, 0, 1);
+    const x = cx + Math.cos(a) * rv, y = cy + Math.sin(a) * rv;
+    i ? c.lineTo(x,y) : c.moveTo(x,y);
+  }
+  c.closePath();
+  const g = c.createRadialGradient(cx, cy, 4, cx, cy, R);
+  g.addColorStop(0,'rgba(49,232,255,.55)');
+  g.addColorStop(1,'rgba(255,47,142,.42)');
+  c.fillStyle = g; c.fill();
+  c.shadowColor = '#31e8ff'; c.shadowBlur = 20;
+  c.strokeStyle = '#9beeff'; c.lineWidth = 2.4; c.stroke();
+  c.shadowBlur = 0;
+  /* 顶点 */
+  for(let i = 0; i < n; i++){
+    const a = -Math.PI/2 + i * TAU / n;
+    const rv = R * clamp(RADAR.values[i].v / 100 * anim, 0, 1);
+    c.beginPath();
+    c.arc(cx + Math.cos(a) * rv, cy + Math.sin(a) * rv, 3.6, 0, TAU);
+    c.fillStyle = '#ff2f8e'; c.fill();
+  }
+  c.restore();
+}
+
+/* ------- 复制报告 ------- */
+$('#btn-copy').addEventListener('click', () => {
+  const m = stats.__m || computeMetrics();
+  const txt =
+    '《赛博醉酒鉴定报告》\n' +
+    '称号：' + $('#r-title').textContent + ' ' + $('#r-tag').textContent + '\n' +
+    '清醒度 ' + Math.round(m.sober) + ' / 手速 ' + Math.round(m.speed) +
+    ' / 语言能力 ' + Math.round(m.lang) + ' / 玄学体质 ' + Math.round(m.mystic) +
+    ' / 酒量 ' + Math.round(m.tol) + '\n' +
+    '赛博醉酒指数：' + Math.round(m.drunk) + '（Lv.' + Math.min(9, 1 + Math.floor(m.drunk/11)) + '）\n' +
+    '走歪 ' + stats.walkDev + ' 次 · 接酒杯得分 ' + stats.score +
+    ' · 误接代码 ' + stats.codes + ' 次 · 绕口令 ' + stats.rounds + ' 轮\n' +
+    '——《赛博酒测》CYBER ALCOHOL TEST CENTER';
+  const done = () => toast('报告已复制到剪贴板');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+  }else{
+    fallbackCopy(txt, done);
+  }
+});
+function fallbackCopy(text, cb){
+  try{
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    cb();
+  }catch(e){ toast('复制失败，请手动截图'); }
+}
+
+/* ------- 再来一次 ------- */
+$('#btn-again').addEventListener('click', () => {
+  resetStats();
+  RADAR = null;
+  L1.on = L2.on = L3.on = false;
+  cancelAnimationFrame(L1.raf); cancelAnimationFrame(L2.raf); cancelAnimationFrame(L3.raf);
+  show('scr-start');
+});
+
+/* ============================================================
+   6. 输入绑定（键盘 / 鼠标 / 触屏）
+   ============================================================ */
+/* 关卡一：按住拖动 = 转向目标 + 自动前进 */
+function l1PointerX(e){
+  const r = L1.cv.getBoundingClientRect();
+  return clamp(e.clientX - r.left, 0, r.width);
+}
+L1.cv.addEventListener('pointerdown', e => {
+  if(!L1.on) return;
+  e.preventDefault();
+  if(L1.cv.setPointerCapture){ try{ L1.cv.setPointerCapture(e.pointerId); }catch(err){} }
+  L1.holding = true;
+  L1.px = l1PointerX(e);
+  $('#tip1').style.opacity = '0.25';
+});
+L1.cv.addEventListener('pointermove', e => {
+  if(!L1.on || L1.px == null) return;
+  L1.px = l1PointerX(e);
+});
+function l1Release(){ L1.holding = false; L1.px = null; }
+L1.cv.addEventListener('pointerup', l1Release);
+L1.cv.addEventListener('pointercancel', l1Release);
+L1.cv.addEventListener('pointerleave', e => { if(e.buttons === 0) l1Release(); });
+L1.cv.addEventListener('contextmenu', e => e.preventDefault());
+
+/* 关卡二：鼠标移动 / 按住拖动控制篮子 */
+function l2PointerX(e){
+  const r = L2.cv.getBoundingClientRect();
+  return clamp(e.clientX - r.left, L2.basketW/2, r.width - L2.basketW/2);
+}
+const stage2 = $('#stage2');
+stage2.addEventListener('pointermove', e => {
+  if(!L2.on) return;
+  L2.basketX = l2PointerX(e);
+});
+stage2.addEventListener('pointerdown', e => {
+  if(!L2.on) return;
+  e.preventDefault();
+  L2.basketX = l2PointerX(e);
+});
+stage2.addEventListener('contextmenu', e => e.preventDefault());
+/* 桌面端也可以用 ← → 控制篮子 */
+setInterval(() => {
+  if(!L2.on) return;
+  if(keys.ArrowLeft)  L2.basketX = clamp(L2.basketX - 13, L2.basketW/2, L2.w - L2.basketW/2);
+  if(keys.ArrowRight) L2.basketX = clamp(L2.basketX + 13, L2.basketW/2, L2.w - L2.basketW/2);
+}, 16);
+
+/* 窗口尺寸变化：重新适配画布（保留游戏状态，不重置进度） */
+let rzT = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(rzT);
+  rzT = setTimeout(() => {
+    if(L1.on) l1Resize();
+    if(L2.on) l2Resize();
+    if($('#scr-r').classList.contains('active')) drawRadar(1);
+  }, 160);
+});
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    if(L1.on) l1Resize();
+    if(L2.on) l2Resize();
+    if($('#scr-r').classList.contains('active')) drawRadar(1);
+  }, 300);
+});
+
+/* ============================================================
+   7. 启动流程
+   ============================================================ */
+$('#btn-start').addEventListener('click', () => {
+  resetStats();
+  beep(700, 0.1, 'square', 0.06);
+  /* 体检须知 → 倒计时 → 关卡一 */
+  showOverlay('ADMISSION · 体检须知', '赛博酒测',
+    '本次体检包含三项：<br>' +
+    '<b>01 走直线</b> · 按住 ↑ / 按住屏幕拖动<br>' +
+    '<b>02 接酒杯</b> · 移动鼠标 / 拖动屏幕控制篮子<br>' +
+    '<b>03 读绕口令</b> · 在心里默读并点击按钮<br><br>' +
+    '所有数据仅用于生成搞笑报告，不会上传到任何服务器。',
+    '开始第一项',
+    () => { show('scr-1'); l1Start(); });
+});
+resetStats();
+})();
+</script>
+</body>
+</html>
